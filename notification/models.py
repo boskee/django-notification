@@ -248,7 +248,7 @@ def get_formatted_messages(formats, label, context):
     return format_templates
 
 
-def send_now(users, label, extra_context=None, on_site=True, sender=None):
+def send_now(users, label, extra_context=None, on_site=True, sender=None, html_email=False, test_content=False):
     """
     Creates a new notice.
     
@@ -306,6 +306,11 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
             "notices_url": notices_url,
             "current_site": current_site,
         })
+        """This is the media setting for emails"""
+        if "http://" in settings.MEDIA_URL:
+            full_url = settings.MEDIA_URL
+        else:
+            full_url = "%s%s" % (current_site, settings.MEDIA_URL)
         context.update(extra_context)
         
         # get prerendered format messages
@@ -324,7 +329,20 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
             notice_type=notice_type, on_site=on_site, sender=sender)
         if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
             recipients.append(user.email)
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
+        if html_email == True:
+            site = Site.objects.get_current()
+            # full_url = "http://%s%s" % (site.domain, settings.MEDIA_URL)
+            
+            html_content = render_to_string('notification/email_body.html', {
+                'message': messages['full.html'],
+            }, context)
+            if test_content == True:
+                return html_content
+            msg = EmailMultiAlternatives(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
+            msg.attach_alternative(html_content, "text/html")
+            msg.send()
+        else:
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
     
     # reset environment to original language
     activate(current_language)
